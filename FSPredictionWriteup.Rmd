@@ -1,0 +1,65 @@
+---
+title: "Prediction Assignment Writeup"
+author: "FS"
+date: "2022-10-05"
+output: html_document
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE,warning = FALSE, cache = TRUE)
+```
+
+## Pre-processing
+
+In this first part, we load the necessary packages and perform some pre-processing.
+We remove the columns with a lot of NAs, as their inclusion doesn't bring much information but
+slows down the runtime. We also remove the first 7 columns, as they bring no information for our goal.We divide the data into training and testing set to evaluate the performances of the algorithm. We perform the same pre-processing on the training and testing data sets.
+
+
+```{r Pre-process}
+library(caret);
+df<-read.csv("pml-training.csv")
+
+#Partition of our data in training in testing.
+inTrain<-createDataPartition(df$classe,p=0.8,list=FALSE)
+training<-df[inTrain,]
+testing<-df[-inTrain,]
+
+#We want to treat the class a a factor
+training$classe<-as.factor(training$classe)
+for (i in 8:159){ #We convert the variables to numeric so we can work with them
+  training[[i]]<-as.numeric(training[[i]])
+  testing[[i]]<-as.numeric(testing[[i]])
+}
+training<-training[,-c(1:7)] # The 7 first columns are not suitable for prediction
+testing<-testing[,-c(1:7)] # The 7 first columns are not suitable for prediction
+
+testing<-testing[ , colSums(is.na(training)) < 14000] #Remove columns with too many Nas
+training<-training[ , colSums(is.na(training)) < 14000] #Remove columns with too many Nas
+```
+
+## Running the model
+
+For the model, I chose random forest. It has good performances and avoids over-fitting.
+It takes a lot of resources, but it works on my computer.
+
+```{r Running of the model}
+modFit<-train(classe ~ .,method="rf",data=training,na.action=na.pass)
+# We use all of the remaining features to predict the class
+```
+
+## Test the model on the training and testing set
+Let's observe the performances of our model on the training and on the testing data.
+We use cross-validation by testing the model on the testing set.
+```{r Test the model}
+pred_training<-predict(modFit,training)
+table(pred_training,training$classe)
+pred_testing<-predict(modFit,testing)
+table(pred_testing,testing$classe)
+prop_train<-sum(pred_training==training$classe)/length(training$classe)
+prop_test<-sum(pred_testing==testing$classe)/length(testing$classe)
+print(paste("Accuracy on training data:",prop_train))
+print(paste("Accuracy on testing data:",prop_test))
+print(paste("We expect the out of sample error to be:",1-prop_test))
+```
+We can see that the out of sample error is very small (<1%).
